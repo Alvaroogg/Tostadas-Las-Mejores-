@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌮 Puesto de Tostadas — POV Web</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="top-bar">
+        <div class="header-left">
+            <h1>🌮 Puesto de Tostadas</h1>
+            <span id="fecha-hoy" class="date-display">📅 Cargando fecha...</span>
+        </div>
+        
+        <div class="header-center">
+            <button id="btn-pendientes" class="btn btn-pending">📌 Pendientes (0)</button>
+            <button id="btn-historial" class="btn btn-secondary">📋 Días Anteriores</button>
+            <button id="btn-terminar-dia" class="btn btn-danger">🔒 Terminar Día</button>
+        </div>
+
+        <div class="header-right">
+            <small>CAJA DEL DÍA</small>
+            <div id="caja-total" class="caja-amount text-success">$0.00</div>
+        </div>
+    </header>
+
+    <!-- Main Layout: 3 Columns -->
+    <main class="container">
+        
+        <!-- Column 1: MENU -->
+        <section class="panel panel-menu">
+            <div class="panel-header">
+                <h2>🍽️ MENÚ</h2>
+            </div>
+            <div class="scroll-area">
+                
+                <h3 class="section-title">── 🌮 TOSTADAS ──</h3>
+                <div class="menu-grid" id="menu-tostadas">
+                    <!-- Botones generados en JS -->
+                </div>
+
+                <h3 class="section-title mt-4">── 🥤 BEBIDAS ──</h3>
+                <div class="menu-grid" id="menu-bebidas">
+                    <!-- Botones generados en JS -->
+                </div>
+
+            </div>
+            <div class="panel-footer">
+                <button id="btn-limpiar" class="btn btn-secondary w-100">🗑️ Limpiar pedido</button>
+            </div>
+        </section>
+
+        <!-- Column 2: CURRENT ORDER -->
+        <section class="panel panel-pedido">
+            <div class="panel-header">
+                <h2>📋 PEDIDO ACTUAL</h2>
+            </div>
+            
+            <div class="table-header">
+                <span class="col-prod">Producto</span>
+                <span class="col-cant">Cant.</span>
+                <span class="col-pu">P.U.</span>
+                <span class="col-sub">Subtotal</span>
+            </div>
+
+            <div class="scroll-area order-list" id="lista-pedido">
+                <div class="empty-state">Sin productos</div>
+            </div>
+
+            <div class="panel-footer">
+                <div class="order-controls">
+                    <button id="btn-quitar-ultimo" class="btn btn-danger-outline">❌ Quitar último</button>
+                    <button id="btn-poner-espera" class="btn btn-pending-outline">📌 Poner en Espera</button>
+                </div>
+                
+                <div class="total-bar">
+                    <span>TOTAL:</span>
+                    <span id="lbl-total-gran" class="text-gold h2">$0.00</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Column 3: CHECKOUT & SUMMARY -->
+        <section class="panel panel-cobro">
+            
+            <!-- Checkout Box -->
+            <div class="checkout-box">
+                <h2>💰 COBRAR</h2>
+                <div id="lbl-cobro-total" class="text-gold fw-bold h3 mb-3">Total: $0.00</div>
+                
+                <label class="text-muted">Pago del cliente ($):</label>
+                <input type="number" id="input-pago" placeholder="0.00" class="input-large">
+                <div id="lbl-preview-cambio" class="preview-text"></div>
+
+                <label class="text-muted mt-3 mb-2 d-block">Pago rápido:</label>
+                <div class="quick-pay-grid">
+                    <button class="btn btn-quick-success" onclick="app.pagoRapido(0)">Exacto</button>
+                    <button class="btn btn-quick" onclick="app.pagoRapido(50)">$50</button>
+                    <button class="btn btn-quick" onclick="app.pagoRapido(100)">$100</button>
+                    <button class="btn btn-quick" onclick="app.pagoRapido(200)">$200</button>
+                    <button class="btn btn-quick" onclick="app.pagoRapido(500)">$500</button>
+                </div>
+
+                <button id="btn-cobrar" class="btn btn-success w-100 btn-large mt-4">✅ COBRAR</button>
+            </div>
+
+            <!-- Daily Summary Box -->
+            <div class="summary-box mt-4">
+                <h2 class="mb-3">📊 Resumen del Día</h2>
+                
+                <div class="scroll-area mini-scroll" id="resumen-productos">
+                    <!-- Contadores generados -->
+                </div>
+
+                <div class="summary-total-row">
+                    <span class="text-gold fw-bold">Total vendidos</span>
+                    <span id="lbl-total-vendidos" class="text-gold fw-bold">0</span>
+                </div>
+
+                <h3 class="mt-4 mb-2 text-muted" style="font-size:0.9rem">Últimas ventas</h3>
+                <textarea id="txt-historial" class="log-box" readonly></textarea>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- MODALS (Hidden by default) -->
+    
+    <!-- Modal: Cantidad -->
+    <div id="modal-cantidad" class="modal-overlay hidden">
+        <div class="modal glass-modal">
+            <h2 id="modal-cant-title" class="mb-2">Agregar Producto</h2>
+            <p class="text-muted mb-4">¿Cuántas desea?</p>
+            <input type="number" id="input-cant" class="input-large text-center mb-4" value="1" min="1">
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="app.cerrarModal('modal-cantidad')">Cancelar</button>
+                <button class="btn btn-success" id="btn-confirm-add">Agregar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Poner en Espera -->
+    <div id="modal-espera" class="modal-overlay hidden">
+        <div class="modal glass-modal">
+            <h2 class="mb-2">Poner en Espera</h2>
+            <p class="text-muted mb-4">Ingrese un nombre para este pedido:</p>
+            <input type="text" id="input-espera-nombre" class="input-large mb-4" placeholder="Ej. Cliente 1">
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="app.cerrarModal('modal-espera')">Cancelar</button>
+                <button class="btn btn-pending" id="btn-confirm-espera">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Ver Pendientes -->
+    <div id="modal-ver-pendientes" class="modal-overlay hidden">
+        <div class="modal glass-modal modal-lg">
+            <h2 class="text-pending mb-4">📌 Pedidos en Espera</h2>
+            <div id="lista-ver-pendientes" class="scroll-area max-h-300 mb-4">
+                <!-- Rellenado por JS -->
+            </div>
+            <div class="modal-actions align-right">
+                <button class="btn btn-secondary" onclick="app.cerrarModal('modal-ver-pendientes')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Ticket de Venta Exitoso -->
+    <div id="modal-ticket" class="modal-overlay hidden">
+        <div class="modal receipt-modal p-0">
+            <div class="receipt-header bg-success">
+                <div class="receipt-icon">✅</div>
+                <h2>¡Venta Exitosa!</h2>
+            </div>
+            <div class="receipt-body">
+                <p id="ticket-hora" class="text-muted text-sm mb-3">🕒 --:--</p>
+                <div class="divider"></div>
+                <p class="text-muted text-sm fw-bold mb-2">Productos:</p>
+                <div id="ticket-items" class="ticket-items-list mb-3"></div>
+                <div class="divider"></div>
+                
+                <div class="d-flex justify-between mt-3 mb-2">
+                    <span class="text-muted">Total:</span>
+                    <span id="ticket-total" class="fw-bold">$0.00</span>
+                </div>
+                <div class="d-flex justify-between mb-4">
+                    <span class="text-muted">Pagó:</span>
+                    <span id="ticket-pago" class="fw-bold">$0.00</span>
+                </div>
+
+                <div class="cambio-box" id="ticket-cambio-box">
+                    <span class="text-muted fw-bold">💵 CAMBIO:</span>
+                    <span id="ticket-cambio" class="h1 fw-bold text-success">$0.00</span>
+                </div>
+            </div>
+            <div class="receipt-footer">
+                <button class="btn btn-success w-100 btn-large" onclick="app.cerrarModal('modal-ticket')">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Historial Días Anteriores -->
+    <div id="modal-historial" class="modal-overlay hidden">
+        <div class="modal glass-modal modal-xl">
+            <h2 class="text-gold mb-4">📋 Resumen de Días Anteriores</h2>
+            <div class="d-flex gap-4">
+                <div class="w-50">
+                    <div id="lista-dias" class="scroll-area max-h-400">
+                        <!-- Rellenado por JS -->
+                    </div>
+                </div>
+                <div class="w-50">
+                    <textarea id="txt-detalle-dia" class="log-box h-100" readonly placeholder="Seleccione un día para ver el detalle..."></textarea>
+                </div>
+            </div>
+            <div class="modal-actions align-right mt-4">
+                <button class="btn btn-danger" onclick="app.cerrarModal('modal-historial')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
