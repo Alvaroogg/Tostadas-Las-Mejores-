@@ -6,7 +6,7 @@ const MENU = {
     "Lomo": 60.00,
     "Mixta": 70.00,
     "Sencilla": 30.00,
-    "Coca": 18.00
+    "Coca": 20.00
 };
 
 const TOSTADAS = ["Cuero", "Deshebrada", "Pata", "Lomo", "Mixta", "Sencilla"];
@@ -48,6 +48,22 @@ Object.keys(MENU).forEach(k => state.tostadasVendidas[k] = 0);
 const app = {
     selectedProduct: null,
 
+    getLocalDateString() {
+        const d = new Date();
+        const pad = n => n.toString().padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    },
+
+    getLocalTimeString() {
+        const d = new Date();
+        const pad = n => n.toString().padStart(2, '0');
+        return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    },
+
+    getLocalIsoString() {
+        return `${this.getLocalDateString()}T${this.getLocalTimeString()}`;
+    },
+
     init() {
         this.loadData();
         this.renderMenu();
@@ -76,8 +92,8 @@ const app = {
         state.ventasTotales = 0;
         Object.keys(MENU).forEach(k => state.tostadasVendidas[k] = 0);
 
-        const today = new Date().toISOString().split('T')[0];
-        
+        const today = this.getLocalDateString();
+
         state.historialVentas.forEach(v => {
             if (v.fecha.startsWith(today)) {
                 state.ventasTotales += v.total;
@@ -108,9 +124,13 @@ const app = {
     },
 
     updateDate() {
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        let str = new Date().toLocaleDateString('es-ES', options);
-        document.getElementById('fecha-hoy').innerText = "📅 " + str.charAt(0).toUpperCase() + str.slice(1);
+        const optionsDate = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const optionsTime = { hour: '2-digit', minute: '2-digit', hour12: true };
+        const now = new Date();
+        let strDate = now.toLocaleDateString('es-ES', optionsDate);
+        let strTime = now.toLocaleTimeString('es-ES', optionsTime);
+        let str = strDate.charAt(0).toUpperCase() + strDate.slice(1) + " - " + strTime;
+        document.getElementById('fecha-hoy').innerText = "📅 " + str;
     },
 
     refreshUI() {
@@ -139,8 +159,8 @@ const app = {
         // Totals
         document.getElementById('lbl-total-gran').innerText = `$${total.toFixed(2)}`;
         document.getElementById('lbl-cobro-total').innerText = `Total: $${total.toFixed(2)}`;
-        document.getElementById('caja-total').innerText = `$${state.ventasTotales.toLocaleString('en-US', {minimumFractionDigits:2})}`;
-        
+        document.getElementById('caja-total').innerText = `$${state.ventasTotales.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
         // Pendientes badge
         const btnPend = document.getElementById('btn-pendientes');
         const numP = state.pedidosPendientes.length;
@@ -149,7 +169,7 @@ const app = {
 
         // Preview Cambio
         this.previewCambio();
-        
+
         // Refresh Resumen Box
         this.refreshResumen();
     },
@@ -158,7 +178,7 @@ const app = {
         const box = document.getElementById('resumen-productos');
         box.innerHTML = '';
         let totalQty = 0;
-        
+
         Object.keys(MENU).forEach(nombre => {
             const cant = state.tostadasVendidas[nombre];
             if (cant > 0) {
@@ -169,20 +189,22 @@ const app = {
                 box.appendChild(div);
             }
         });
-        
+
         document.getElementById('lbl-total-vendidos').innerText = totalQty;
-        
+
         // Historial text
         const txt = document.getElementById('txt-historial');
-        const today = new Date().toISOString().split('T')[0];
+        const today = this.getLocalDateString();
         const todaysSales = state.historialVentas.filter(v => v.fecha.startsWith(today)).reverse(); // latest first
-        
+
         if (todaysSales.length === 0) {
             txt.value = "Aún no hay ventas hoy.";
         } else {
             txt.value = todaysSales.map(v => {
                 let time = v.fecha.split('T')[1].substring(0, 5);
-                return `[${time}] Venta: $${v.total.toFixed(2)}`;
+                let clienteTxt = v.cliente ? ` (${v.cliente})` : "";
+                let productosTxt = v.productos.map(p => `${p.cantidad}x ${p.nombre}`).join(', ');
+                return `[${time}] $${v.total.toFixed(2)}${clienteTxt} - Pedido: ${productosTxt}`;
             }).join('\n');
         }
     },
@@ -191,12 +213,12 @@ const app = {
         const total = this.getTotalPedido();
         const input = document.getElementById('input-pago');
         const lbl = document.getElementById('lbl-preview-cambio');
-        
+
         if (total === 0) {
             lbl.innerText = "";
             return;
         }
-        
+
         const pago = parseFloat(input.value) || 0;
         if (pago >= total) {
             const cambio = pago - total;
@@ -225,14 +247,14 @@ const app = {
     confirmAddProduct() {
         const cant = parseInt(document.getElementById('input-cant').value);
         if (isNaN(cant) || cant <= 0) return;
-        
+
         state.pedidoActual.push({
             nombre: this.selectedProduct,
             cantidad: cant,
             precio: MENU[this.selectedProduct],
             subtotal: cant * MENU[this.selectedProduct]
         });
-        
+
         this.cerrarModal('modal-cantidad');
         this.refreshUI();
     },
@@ -246,6 +268,9 @@ const app = {
 
     limpiarPedido() {
         state.pedidoActual = [];
+        state.clienteActual = null;
+        const inputCliente = document.getElementById('input-cliente-cobro');
+        if (inputCliente) inputCliente.value = '';
         this.refreshUI();
     },
 
@@ -254,22 +279,29 @@ const app = {
             alert('No hay pedido para poner en espera.');
             return;
         }
-        document.getElementById('input-espera-nombre').value = '';
+        const inputCliente = document.getElementById('input-cliente-cobro');
+        const defaultName = inputCliente ? inputCliente.value.trim() : (state.clienteActual || "");
+
+        document.getElementById('input-espera-nombre').value = defaultName;
         this.mostrarModal('modal-espera');
-        setTimeout(() => document.getElementById('input-espera-nombre').focus(), 100);
+        setTimeout(() => {
+            const el = document.getElementById('input-espera-nombre');
+            el.focus();
+            el.select();
+        }, 100);
     },
 
     confirmEspera() {
         const name = document.getElementById('input-espera-nombre').value.trim();
         if (!name) return;
-        
+
         state.pedidosPendientes.push({
             cliente: name,
             pedido: [...state.pedidoActual],
             total: this.getTotalPedido(),
-            hora: new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit'})
+            hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
         });
-        
+
         this.saveData();
         this.limpiarPedido();
         this.cerrarModal('modal-espera');
@@ -280,10 +312,10 @@ const app = {
             alert('No hay pedidos pendientes.');
             return;
         }
-        
+
         const list = document.getElementById('lista-ver-pendientes');
         list.innerHTML = '';
-        
+
         state.pedidosPendientes.forEach((ped, idx) => {
             const div = document.createElement('div');
             div.style.backgroundColor = 'rgba(0,0,0,0.2)';
@@ -293,7 +325,7 @@ const app = {
             div.style.display = 'flex';
             div.style.justifyContent = 'space-between';
             div.style.alignItems = 'center';
-            
+
             div.innerHTML = `
                 <div>
                     <div class="fw-bold">👤 ${ped.cliente}</div>
@@ -304,17 +336,21 @@ const app = {
             `;
             list.appendChild(div);
         });
-        
+
         this.mostrarModal('modal-ver-pendientes');
     },
 
     reanudarPendiente(idx) {
         if (state.pedidoActual.length > 0) {
-            if(!confirm("Tiene un pedido actual. Se borrará si reanuda este sin ponerlo en espera.\n¿Continuar?")) return;
+            if (!confirm("Tiene un pedido actual. Se borrará si reanuda este sin ponerlo en espera.\n¿Continuar?")) return;
         }
-        
+
         const ped = state.pedidosPendientes.splice(idx, 1)[0];
         state.pedidoActual = ped.pedido;
+        state.clienteActual = ped.cliente; // Guardar el cliente para la venta
+        const inputCliente = document.getElementById('input-cliente-cobro');
+        if (inputCliente) inputCliente.value = ped.cliente;
+
         this.saveData();
         this.refreshUI();
         this.cerrarModal('modal-ver-pendientes');
@@ -334,40 +370,47 @@ const app = {
             alert("No hay nada que cobrar.");
             return;
         }
-        
+
         const pago = parseFloat(document.getElementById('input-pago').value);
         if (isNaN(pago) || pago < total) {
             alert("El pago ingresado no es válido o es insuficiente.");
             return;
         }
-        
+
         const cambio = pago - total;
-        const now = new Date();
-        const fechaIso = now.toISOString().split('.')[0]; // YYYY-MM-DDTHH:mm:ss
-        
+        const fechaIso = this.getLocalIsoString();
+        const inputCliente = document.getElementById('input-cliente-cobro');
+        const clienteVal = inputCliente ? inputCliente.value.trim() : (state.clienteActual || "");
+
         const venta = {
             fecha: fechaIso,
+            cliente: clienteVal || "Mostrador",
             productos: [...state.pedidoActual],
             total: total,
             pago: pago,
             cambio: cambio
         };
-        
+
         state.historialVentas.push(venta);
+
+        // Reset cliente actual
+        state.clienteActual = null;
+        if (inputCliente) inputCliente.value = '';
+
         this.saveData();
         this.calculateDailyStats();
-        
+
         this.limpiarPedido();
         document.getElementById('input-pago').value = '';
         this.previewCambio();
-        
+
         this.mostrarTicket(venta);
     },
 
     mostrarTicket(venta) {
         const time = venta.fecha.split('T')[1].substring(0, 5);
         document.getElementById('ticket-hora').innerText = `🕒 ${time}`;
-        
+
         const list = document.getElementById('ticket-items');
         list.innerHTML = venta.productos.map(p => `
             <div class="ticket-item">
@@ -376,14 +419,14 @@ const app = {
                 <div class="sub">$${p.subtotal.toFixed(2)}</div>
             </div>
         `).join('');
-        
+
         document.getElementById('ticket-total').innerText = `$${venta.total.toFixed(2)}`;
         document.getElementById('ticket-pago').innerText = `$${venta.pago.toFixed(2)}`;
-        
+
         const cambioEl = document.getElementById('ticket-cambio');
         const cambioBox = document.getElementById('ticket-cambio-box');
         cambioEl.innerText = `$${venta.cambio.toFixed(2)}`;
-        
+
         if (venta.cambio > 0) {
             cambioEl.className = 'h1 fw-bold text-pending';
             cambioBox.style.backgroundColor = 'rgba(243, 156, 18, 0.1)';
@@ -391,7 +434,7 @@ const app = {
             cambioEl.className = 'h1 fw-bold text-success';
             cambioBox.style.backgroundColor = 'rgba(46, 204, 113, 0.1)';
         }
-        
+
         this.mostrarModal('modal-ticket');
     },
 
@@ -404,29 +447,30 @@ const app = {
             grouped[d].total += v.total;
             grouped[d].list.push(v);
         });
-        
+
         const listEl = document.getElementById('lista-dias');
         listEl.innerHTML = '';
         const detailEl = document.getElementById('txt-detalle-dia');
         detailEl.value = 'Seleccione un día para ver el detalle...';
-        
+
         const dates = Object.keys(grouped).sort().reverse();
         if (dates.length === 0) {
             listEl.innerHTML = '<div class="text-muted p-3">No hay datos históricos.</div>';
             this.mostrarModal('modal-historial');
             return;
         }
-        
+
         dates.forEach(d => {
             const btn = document.createElement('button');
             btn.className = 'btn btn-secondary w-100 d-flex justify-between mb-2 text-left p-3';
             btn.innerHTML = `<span>📅 ${d}</span> <span class="text-gold fw-bold">$${grouped[d].total.toFixed(2)}</span>`;
-            
+
             btn.onclick = () => {
                 let lines = [`=== VENTAS DEL ${d} ===`, `TOTAL: $${grouped[d].total.toFixed(2)}`, `VENTAS: ${grouped[d].list.length}\n`];
                 grouped[d].list.forEach(v => {
                     const time = v.fecha.split('T')[1];
-                    lines.push(`[${time}] - Venta: $${v.total.toFixed(2)}`);
+                    const clienteTxt = v.cliente ? ` (${v.cliente})` : '';
+                    lines.push(`[${time}] - Venta: $${v.total.toFixed(2)}${clienteTxt}`);
                     v.productos.forEach(p => {
                         lines.push(`  - ${p.cantidad}x ${p.nombre} ($${p.subtotal.toFixed(2)})`);
                     });
@@ -435,16 +479,16 @@ const app = {
             };
             listEl.appendChild(btn);
         });
-        
+
         this.mostrarModal('modal-historial');
     },
 
     terminarDia() {
-        if(!confirm("¿Está seguro de cerrar la caja de hoy?\nSe mostrará el resumen final y solo quedará registrado en el historial.")) return;
-        
+        if (!confirm("¿Está seguro de cerrar la caja de hoy?\nSe mostrará el resumen final y solo quedará registrado en el historial.")) return;
+
         let resumen = `=== RESUMEN DE VENTAS ===\n`;
         resumen += `Total en Caja: $${state.ventasTotales.toFixed(2)}\n\nProductos:\n`;
-        
+
         let found = false;
         Object.keys(state.tostadasVendidas).forEach(k => {
             if (state.tostadasVendidas[k] > 0) {
@@ -453,7 +497,7 @@ const app = {
             }
         });
         if (!found) resumen += " Ninguno\n";
-        
+
         alert(resumen);
         // Note: in the Python app, data is kept. Here it's also kept in localStorage.
     },
@@ -471,13 +515,13 @@ const app = {
         document.getElementById('btn-historial').onclick = () => this.abrirHistorial();
         document.getElementById('btn-terminar-dia').onclick = () => this.terminarDia();
         document.getElementById('btn-cobrar').onclick = () => this.cobrar();
-        
+
         document.getElementById('input-pago').addEventListener('input', () => this.previewCambio());
-        
+
         // Modal Confirmation bindings
         document.getElementById('btn-confirm-add').onclick = () => this.confirmAddProduct();
         document.getElementById('btn-confirm-espera').onclick = () => this.confirmEspera();
-        
+
         // Enter key support in modals
         document.getElementById('input-cant').addEventListener('keyup', (e) => {
             if (e.key === 'Enter') this.confirmAddProduct();
